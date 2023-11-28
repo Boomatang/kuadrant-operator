@@ -12,11 +12,11 @@ func LimitadorMutator(existingObj, desiredObj client.Object) (bool, error) {
 	update := false
 	existing, ok := existingObj.(*limitadorv1alpha1.Limitador)
 	if !ok {
-		return false, fmt.Errorf("%T is not a *limitadorv1alpha1.Limitador", existingObj)
+		return false, fmt.Errorf("existingObj %T is not a *limitadorv1alpha1.Limitador", existingObj)
 	}
 	desired, ok := desiredObj.(*limitadorv1alpha1.Limitador)
 	if !ok {
-		return false, fmt.Errorf("%T is not a *limitadorv1alpha1.Limitador", existingObj)
+		return false, fmt.Errorf("desireObj %T is not a *limitadorv1alpha1.Limitador", desiredObj)
 	}
 
 	existingSpec := limitadorSpecSubSet(existing.Spec)
