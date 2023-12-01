@@ -2,9 +2,10 @@ package kuadranttools
 
 import (
 	"fmt"
+	"reflect"
+
 	"github.com/kuadrant/kuadrant-operator/api/v1beta1"
 	limitadorv1alpha1 "github.com/kuadrant/limitador-operator/api/v1alpha1"
-	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
