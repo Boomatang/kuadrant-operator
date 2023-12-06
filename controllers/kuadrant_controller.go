@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"encoding/json"
+	"reflect"
 
 	"github.com/kuadrant/kuadrant-operator/pkg/kuadranttools"
 	corev1 "k8s.io/api/core/v1"
@@ -508,6 +509,22 @@ func (r *KuadrantReconciler) reconcileLimitador(ctx context.Context, kObj *kuadr
 			limitador.Spec.Storage = kObj.Spec.Limitador.Storage
 		}
 	}
+
+	tmp := &limitadorv1alpha1.Limitador{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "temp",
+			Namespace: kObj.Namespace,
+		},
+	}
+	err = r.SetOwnerReference(kObj, tmp)
+	if err != nil {
+		return err
+	}
+
+	if limitador.OwnerReferences != nil && !reflect.DeepEqual(tmp.OwnerReferences, limitador.OwnerReferences) {
+		return nil
+	}
+
 	err = r.SetOwnerReference(kObj, limitador)
 	if err != nil {
 		return err
