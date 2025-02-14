@@ -339,7 +339,7 @@ build: DIRTY=$(shell $(PROJECT_PATH)/utils/check-git-dirty.sh || echo "unknown")
 build: generate fmt vet ## Build manager binary.
 	go build -ldflags "-X main.version=v$(VERSION) -X main.gitSHA=${GIT_SHA} -X main.dirty=${DIRTY}" -o bin/manager main.go
 
-run: export LOG_LEVEL = debug
+run: export LOG_LEVEL = info
 run: export LOG_MODE = development
 run: export OPERATOR_NAMESPACE := $(OPERATOR_NAMESPACE)
 run: GIT_SHA=$(shell git rev-parse HEAD || echo "unknown")

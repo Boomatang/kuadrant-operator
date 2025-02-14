@@ -32,6 +32,18 @@ func (r *EffectiveRateLimitPolicyReconciler) Subscription() controller.Subscript
 	}
 }
 
+func (r *EffectiveRateLimitPolicyReconciler) Foo(ctx context.Context, _ []controller.ResourceEvent, topology *machinery.Topology, err error, state *sync.Map) error {
+	logger := controller.LoggerFromContext(ctx).WithName("EffectiveRateLimitPolicyFoo")
+	logger.Info("Foo Error Handler", "status", "started")
+	defer logger.Info("Foo Error Handeler", "status", "completed")
+	return err
+}
+func (r *EffectiveRateLimitPolicyReconciler) Bar(ctx context.Context, _ []controller.ResourceEvent, topology *machinery.Topology, err error, state *sync.Map) error {
+	logger := controller.LoggerFromContext(ctx).WithName("EffectiveRateLimitPolicyBar")
+	logger.Info("Bar Error Handler", "status", "started")
+	defer logger.Info("Bar Error Handeler", "status", "completed")
+	return err
+}
 func (r *EffectiveRateLimitPolicyReconciler) Reconcile(ctx context.Context, _ []controller.ResourceEvent, topology *machinery.Topology, _ error, state *sync.Map) error {
 	logger := controller.LoggerFromContext(ctx).WithName("EffectiveRateLimitPolicyReconciler")
 	logger.V(1).Info("generating effective rate limit policy", "status", "started")

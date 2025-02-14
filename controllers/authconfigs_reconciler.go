@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+	"time"
 
 	authorinov1beta3 "github.com/kuadrant/authorino/api/v1beta3"
 	"github.com/kuadrant/policy-machinery/controller"
@@ -46,6 +47,8 @@ func (r *AuthConfigsReconciler) Subscription() controller.Subscription {
 
 func (r *AuthConfigsReconciler) Reconcile(ctx context.Context, _ []controller.ResourceEvent, topology *machinery.Topology, _ error, state *sync.Map) error {
 	logger := controller.LoggerFromContext(ctx).WithName("AuthConfigsReconciler")
+	logger.Info("Auth Config Reconciler", "status", "started")
+	defer logger.Info("Auth Config Reconciler", "status", "completed")
 
 	authorino := GetAuthorinoFromTopology(topology)
 	if authorino == nil {
@@ -133,10 +136,15 @@ func (r *AuthConfigsReconciler) Reconcile(ctx context.Context, _ []controller.Re
 			logger.Error(err, "failed to destruct authconfig object", "httpRoute", httpRouteKey.String(), "httpRouteRule", httpRouteRuleKey, "authconfig", existingAuthConfig)
 			continue
 		}
+
+		logger.Info("sleeping the reconcile before doing the updates", "status", "sleeping")
+		time.Sleep(time.Second * 2)
+		logger.Info("cancal context", "status", "creating error")
 		if _, err = resource.Update(ctx, existingAuthConfigUnstructured, metav1.UpdateOptions{}); err != nil {
 			logger.Error(err, "failed to update authconfig object", "httpRoute", httpRouteKey.String(), "httpRouteRule", httpRouteRuleKey, "authconfig", existingAuthConfigUnstructured.Object)
 			// TODO: handle error
 		}
+		logger.Info("update has completed", "status", "okay")
 	}
 
 	if len(modifiedAuthConfigs) > 0 {
@@ -148,6 +156,7 @@ func (r *AuthConfigsReconciler) Reconcile(ctx context.Context, _ []controller.Re
 		_, desired := desiredAuthConfigs[k8stypes.NamespacedName{Name: o.GetName(), Namespace: o.GetNamespace()}]
 		return o.GroupVersionKind().GroupKind() == kuadrantauthorino.AuthConfigGroupKind && labels.Set(o.(*controller.RuntimeObject).GetLabels()).AsSelector().Matches(AuthObjectLabels()) && !desired
 	})
+
 	for _, authConfig := range staleAuthConfigs {
 		if err := r.client.Resource(kuadrantauthorino.AuthConfigsResource).Namespace(authConfig.GetNamespace()).Delete(ctx, authConfig.GetName(), metav1.DeleteOptions{}); err != nil {
 			logger.Error(err, "failed to delete authconfig object", "authconfig", fmt.Sprintf("%s/%s", authConfig.GetNamespace(), authConfig.GetName()))

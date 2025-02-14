@@ -96,3 +96,5 @@ require (
 )
 
 replace github.com/imdario/mergo => dario.cat/mergo v0.3.5
+
+replace github.com/kuadrant/policy-machinery => ../../policy-machinery/explore_container_runtime

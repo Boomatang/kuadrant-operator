@@ -2,7 +2,9 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"sync"
+	"time"
 
 	"github.com/kuadrant/policy-machinery/controller"
 	"github.com/kuadrant/policy-machinery/machinery"
@@ -41,8 +43,8 @@ func (r *RateLimitPolicyValidator) Validate(ctx context.Context, _ []controller.
 		return o.GroupVersionKind().GroupKind() == kuadrantv1.RateLimitPolicyGroupKind
 	})
 
-	logger.V(1).Info("validating rate limit policies", "policies", len(policies))
-	defer logger.V(1).Info("finished validating rate limit policies")
+	logger.V(0).Info("validating rate limit policies", "status", "strated", "policies", len(policies))
+	defer logger.V(0).Info("validating rate limit policies", "status", "completed")
 
 	state.Store(StateRateLimitPolicyValid, lo.SliceToMap(policies, func(policy machinery.Policy) (string, error) {
 		if err := r.isMissingDependency(); err != nil {
@@ -64,7 +66,9 @@ func (r *RateLimitPolicyValidator) Validate(ctx context.Context, _ []controller.
 		return policy.GetLocator(), err
 	}))
 
-	return nil
+	ctx.Done()
+	time.Sleep(time.Second * 2)
+	return fmt.Errorf("I raised this error")
 }
 
 func (r *RateLimitPolicyValidator) isMissingDependency() error {

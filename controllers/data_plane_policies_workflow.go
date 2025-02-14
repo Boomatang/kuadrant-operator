@@ -66,6 +66,7 @@ func NewDataPlanePoliciesWorkflow(client *dynamic.DynamicClient, isGatewayAPInst
 			(&AuthPolicyValidator{isGatewayAPIInstalled: isGatewayAPInstalled, isAuthorinoOperatorInstalled: isAuthorinoOperatorInstalled, isGatewayProviderInstalled: isGatewayProviderInstalled}).Subscription().Reconcile,
 			(&RateLimitPolicyValidator{isGatewayAPIInstalled: isGatewayAPInstalled, isLimitadorOperatorInstalled: isLimitadorOperatorInstalled, isGatewayProviderInstalled: isGatewayProviderInstalled}).Subscription().Reconcile,
 		},
+		// ErrorHandler: (&EffectiveRateLimitPolicyReconciler{client: client}).Bar,
 	}
 
 	effectiveDataPlanePoliciesWorkflow := &controller.Workflow{
@@ -104,6 +105,7 @@ func NewDataPlanePoliciesWorkflow(client *dynamic.DynamicClient, isGatewayAPInst
 		Precondition:  dataPlanePoliciesValidation.Run,
 		Tasks:         []controller.ReconcileFunc{effectiveDataPlanePoliciesWorkflow.Run},
 		Postcondition: dataPlanePoliciesStatus.Run,
+		// ErrorHandler:  (&EffectiveRateLimitPolicyReconciler{client: client}).Foo,
 	}
 }
 
