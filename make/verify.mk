@@ -37,7 +37,3 @@ verify-manifests: ## Verify manifests update.
 	make verify-bundle
 	make verify-helm-charts
 
-.PHONY: verify-prepare-release ## Verify set of manifests based on release.yaml file.
-verify-prepare-release: prepare-release
-	git diff --exit-code .
-

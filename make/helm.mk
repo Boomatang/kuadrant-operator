@@ -6,24 +6,9 @@ CHART_NAME ?= kuadrant-operator
 CHART_DIRECTORY ?= charts/$(CHART_NAME)
 
 .PHONY: helm-build
-helm-build: $(YQ) kustomize manifests ## Build the helm chart from kustomize manifests
-	# Set desired Wasm-shim image
-	V="$(RELATED_IMAGE_WASMSHIM)" \
-	$(YQ) eval '(select(.kind == "Deployment").spec.template.spec.containers[].env[] | select(.name == "RELATED_IMAGE_WASMSHIM").value) = strenv(V)' -i config/manager/manager.yaml
-	# Set desired ConsolePlugin image
-	V="$(RELATED_IMAGE_CONSOLEPLUGIN)" \
-	$(YQ) eval '(select(.kind == "Deployment").spec.template.spec.containers[].env[] | select(.name == "RELATED_IMAGE_CONSOLEPLUGIN").value) = strenv(V)' -i config/manager/manager.yaml
-	# Set desired operator image
-	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
-	# Build the helm chart templates from kustomize manifests
-	$(KUSTOMIZE) build config/helm > $(CHART_DIRECTORY)/templates/manifests.yaml
-	# Set the helm chart version and dependencies versions
-	V="$(BUNDLE_VERSION)" $(YQ) -i e '.version = strenv(V)' $(CHART_DIRECTORY)/Chart.yaml
-	V="$(BUNDLE_VERSION)" $(YQ) -i e '.appVersion = strenv(V)' $(CHART_DIRECTORY)/Chart.yaml
-	V="$(AUTHORINO_OPERATOR_BUNDLE_VERSION)" $(YQ) -i e '(.dependencies[] | select(.name == "authorino-operator").version) = strenv(V)' $(CHART_DIRECTORY)/Chart.yaml
-	V="$(LIMITADOR_OPERATOR_BUNDLE_VERSION)" $(YQ) -i e '(.dependencies[] | select(.name == "limitador-operator").version) = strenv(V)' $(CHART_DIRECTORY)/Chart.yaml
-	V="$(DNS_OPERATOR_BUNDLE_VERSION)" $(YQ) -i e '(.dependencies[] | select(.name == "dns-operator").version) = strenv(V)' $(CHART_DIRECTORY)/Chart.yaml
-
+helm-build: $(YQ) $(CONTROLLER_GEN) $(KUSTOMIZE)
+	PATH=$(PROJECT_PATH)/bin:$$PATH; $(PROJECT_PATH)/utils/release/release.sh verify_release_file dependencies-manifests manifests make_bundle
+ g
 .PHONY: helm-install
 helm-install: $(HELM) ## Install the helm chart
 	# Install the helm chart in the cluster

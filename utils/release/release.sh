@@ -7,7 +7,7 @@ script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
 # Configuration
 ROOT="${ROOT:-$(pwd)}"
-grep=""
+grep=()
 dry_run="0"
 
 # Parse arguments
@@ -15,7 +15,7 @@ while [[ $# -gt 0 ]]; do
     echo "ARG: \"$1\""
     case "$1" in
         "--dry_run") dry_run="1"; shift ;;
-        *) grep="$1"; shift; break ;;
+        *) grep+=("$1"); shift ;;
     esac
 done
 
@@ -38,9 +38,19 @@ run_tasks() {
     tasks=($(find "$script_dir/$dir_name" -mindepth 1 -maxdepth 1 -perm -001 | sort))
 
     for task in "${tasks[@]}"; do
-        if [[ -n "$grep" && ! "$task" =~ "$grep" ]]; then
-            log "grep '$grep' filtered out $task"
-            continue
+        if [[  "${#grep[@]}" -gt 0 ]]; then
+            actionable="0"
+            for g in "${grep[@]}"; do
+                if [[ -n "$g" && "$task" =~ "$g" ]]; then
+                    actionable="1"
+                    break
+                fi
+            done
+
+            if [[ $actionable == "0" ]]; then
+                log "grep '$grep[*]' filtered out $task"
+                continue
+            fi
         fi
 
         log "running script: $task"
@@ -57,7 +67,7 @@ run_tasks() {
 }
 
 # Main execution
-log "RUN: root: $ROOT -- grep: $grep"
+log "RUN: root: $ROOT -- grep: ${grep[*]}"
 log "$script_dir"
 
 # Run all phases

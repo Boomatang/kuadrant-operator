@@ -295,18 +295,12 @@ define update-csv-config
 endef
 
 .PHONY: manifests
-manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	$(CONTROLLER_GEN) crd paths="./api/v1beta1;./api/v1" output:crd:artifacts:config=config/crd/bases
-	$(CONTROLLER_GEN) rbac:roleName=manager-role webhook paths="./..."
+manifests: $(YQ) $(controller-gen) ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
+	PATH=$(PROJECT_PATH)/bin:$$PATH; $(PROJECT_PATH)/utils/release/release.sh verify_release_file manifests 
 
 .PHONY: dependencies-manifests
-dependencies-manifests: export AUTHORINO_OPERATOR_GITREF := $(AUTHORINO_OPERATOR_GITREF)
-dependencies-manifests: export LIMITADOR_OPERATOR_GITREF := $(LIMITADOR_OPERATOR_GITREF)
-dependencies-manifests: export DNS_OPERATOR_GITREF := $(DNS_OPERATOR_GITREF)
-dependencies-manifests: ## Update kuadrant dependencies manifests.
-	$(call patch-config,config/dependencies/authorino/kustomization.template.yaml,config/dependencies/authorino/kustomization.yaml)
-	$(call patch-config,config/dependencies/limitador/kustomization.template.yaml,config/dependencies/limitador/kustomization.yaml)
-	$(call patch-config,config/dependencies/dns/kustomization.template.yaml,config/dependencies/dns/kustomization.yaml)
+dependencies-manifests:	$(YQ) $(CONTROLLER_GEN) $(OPM) $(KUSTOMIZE) $(OPERATOR_SDK) ## Update kuadrant dependencies manifests.
+	PATH=$(PROJECT_PATH)/bin:$$PATH; $(PROJECT_PATH)/utils/release/release.sh verify_release_file dependencies-manifests
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
@@ -401,28 +395,8 @@ endef
 RELATED_IMAGE_CONSOLEPLUGIN ?= quay.io/kuadrant/console-plugin:latest
 
 .PHONY: bundle
-bundle: $(OPM) $(YQ) manifests dependencies-manifests kustomize operator-sdk ## Generate bundle manifests and metadata, then validate generated files.
-	$(OPERATOR_SDK) generate kustomize manifests -q
-	# Set desired Wasm-shim image
-	V="$(RELATED_IMAGE_WASMSHIM)" \
-	$(YQ) eval '(select(.kind == "Deployment").spec.template.spec.containers[].env[] | select(.name == "RELATED_IMAGE_WASMSHIM").value) = strenv(V)' -i config/manager/manager.yaml
-	# Set desired ConsolePlugin image
-	V="$(RELATED_IMAGE_CONSOLEPLUGIN)" \
-	$(YQ) eval '(select(.kind == "Deployment").spec.template.spec.containers[].env[] | select(.name == "RELATED_IMAGE_CONSOLEPLUGIN").value) = strenv(V)' -i config/manager/manager.yaml
-	# Set desired operator image
-	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
-	# Update CSV
-	$(call update-csv-config,kuadrant-operator.v$(BUNDLE_VERSION),config/manifests/bases/kuadrant-operator.clusterserviceversion.yaml,.metadata.name)
-	$(call update-csv-config,$(BUNDLE_VERSION),config/manifests/bases/kuadrant-operator.clusterserviceversion.yaml,.spec.version)
-	$(call update-csv-config,$(IMG),config/manifests/bases/kuadrant-operator.clusterserviceversion.yaml,.metadata.annotations.containerImage)
-	# Generate bundle
-	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle -q --overwrite --version $(BUNDLE_VERSION) $(BUNDLE_METADATA_OPTS)
-	$(MAKE) bundle-post-generate LIMITADOR_OPERATOR_BUNDLE_IMG=$(LIMITADOR_OPERATOR_BUNDLE_IMG) \
-		AUTHORINO_OPERATOR_BUNDLE_IMG=$(AUTHORINO_OPERATOR_BUNDLE_IMG) \
-		DNS_OPERATOR_BUNDLE_IMG=$(DNS_OPERATOR_BUNDLE_IMG)
-	$(OPERATOR_SDK) bundle validate ./bundle
-	$(MAKE) bundle-ignore-createdAt
-	echo "$$QUAY_EXPIRY_TIME_LABEL" >> bundle.Dockerfile
+bundle:$(YQ) $(CONTROLLER_GEN) $(OPM) $(KUSTOMIZE) $(OPERATOR_SDK) ## Generate bundle manifests and metadata, then validate generated files.
+	PATH=$(PROJECT_PATH)/bin:$$PATH; $(PROJECT_PATH)/utils/release/release.sh verify_release_file dependencies-manifests manifests make_bundle
 
 .PHONY: bundle-post-generate
 bundle-post-generate: OPENSHIFT_VERSIONS_ANNOTATION_KEY="com.redhat.openshift.versions"
