@@ -155,36 +155,36 @@ func (r *AuthPolicyStatusUpdater) UpdateStatus(ctx context.Context, _ []controll
 }
 
 func (r *AuthPolicyStatusUpdater) enforcedCondition(policy *kuadrantv1.AuthPolicy, topology *machinery.Topology, state *sync.Map, logger logr.Logger) *metav1.Condition {
-	kObj := GetKuadrantFromTopology(topology)
-	if kObj == nil {
+	kObj := GetKuadrantFromTopology(topology) // NOTE: This could be pass in as a nil pointer
+	if kObj == nil {                          // NOTE: Why do this check at all. If we pass in the kObj we can check before had and short this check.
 		return kuadrant.EnforcedCondition(policy, kuadrant.NewErrSystemResource("kuadrant"), false)
 	}
 	policyKind := kuadrantv1.AuthPolicyGroupKind.Kind
 
-	effectivePolicies, ok := state.Load(StateEffectiveAuthPolicies)
-	if !ok {
+	effectivePolicies, ok := state.Load(StateEffectiveAuthPolicies) // NOTE: unless we update state somewhere this could also be passed in. Even in we update state, this could be a pointer.
+	if !ok {                                                        // NOTE: If the value is being passed in this check can be done out side the scope of the loop
 		return kuadrant.EnforcedCondition(policy, kuadrant.NewErrUnknown(policyKind, ErrMissingStateEffectiveAuthPolicies), false)
 	}
 
-	type affectedGateway struct {
+	type affectedGateway struct { // HACK: This might work better if defined out side the loop
 		gateway      *machinery.Gateway
 		gatewayClass *machinery.GatewayClass
 	}
 
 	// check the state of the rules of the policy in the effective policies
 	policyRuleKeys := lo.Keys(policy.Rules())
-	overridingPolicies := map[string][]string{}                     // policyRuleKey → locators of policies overriding the policy rule
-	affectedGateways := map[string]affectedGateway{}                // Gateway locator → {GatewayClass, Gateway}
-	affectedHTTPRouteRules := map[string]*machinery.HTTPRouteRule{} // pathID → HTTPRouteRule
-	affectedGRPCRouteRules := map[string]*machinery.GRPCRouteRule{} // pathID → GRPCRouteRule
-	setAffectedHTTPObjects := func(pathID string, gatewayClass *machinery.GatewayClass, gateway *machinery.Gateway, httpRouteRule *machinery.HTTPRouteRule) {
+	overridingPolicies := map[string][]string{}                                                                                                               // policyRuleKey → locators of policies overriding the policy rule
+	affectedGateways := map[string]affectedGateway{}                                                                                                          // Gateway locator → {GatewayClass, Gateway}
+	affectedHTTPRouteRules := map[string]*machinery.HTTPRouteRule{}                                                                                           // pathID → HTTPRouteRule
+	affectedGRPCRouteRules := map[string]*machinery.GRPCRouteRule{}                                                                                           // pathID → GRPCRouteRule
+	setAffectedHTTPObjects := func(pathID string, gatewayClass *machinery.GatewayClass, gateway *machinery.Gateway, httpRouteRule *machinery.HTTPRouteRule) { // PERF: function definetion might be better out side the hot path
 		affectedGateways[gateway.GetLocator()] = affectedGateway{
 			gateway:      gateway,
 			gatewayClass: gatewayClass,
 		}
 		affectedHTTPRouteRules[pathID] = httpRouteRule
 	}
-	setAffectedGRPCObjects := func(pathID string, gatewayClass *machinery.GatewayClass, gateway *machinery.Gateway, grpcRouteRule *machinery.GRPCRouteRule) {
+	setAffectedGRPCObjects := func(pathID string, gatewayClass *machinery.GatewayClass, gateway *machinery.Gateway, grpcRouteRule *machinery.GRPCRouteRule) { // PERF: function definetion might be better out side the hot path
 		affectedGateways[gateway.GetLocator()] = affectedGateway{
 			gateway:      gateway,
 			gatewayClass: gatewayClass,
@@ -195,14 +195,14 @@ func (r *AuthPolicyStatusUpdater) enforcedCondition(policy *kuadrantv1.AuthPolic
 	var celValidationErrors []error
 	var celIssuesByPathID map[string][]*cel.Issue
 	var celIssuesFound bool
-	stateCelValErrors, stateCelValErrorsFound := state.Load(cel.StateCELValidationErrors)
+	stateCelValErrors, stateCelValErrorsFound := state.Load(cel.StateCELValidationErrors) // NOTE: Might be able to get away with passing this value in. More understanding is required
 	if stateCelValErrorsFound {
 		celIssuesCollection := stateCelValErrors.(*cel.IssueCollection)
 		celIssuesByPathID, celIssuesFound = celIssuesCollection.GetByPolicyKind(policyKind)
 	}
 
 	for pathID, effectivePolicy := range effectivePolicies.(EffectiveAuthPolicies) {
-		if len(kuadrantv1.PoliciesInPath(effectivePolicy.Path, func(p machinery.Policy) bool { return p.GetLocator() == policy.GetLocator() })) == 0 {
+		if len(kuadrantv1.PoliciesInPath(effectivePolicy.Path, func(p machinery.Policy) bool { return p.GetLocator() == policy.GetLocator() })) == 0 { // PERF: Does the function inline defintion make a difference?
 			continue
 		}
 
@@ -213,7 +213,7 @@ func (r *AuthPolicyStatusUpdater) enforcedCondition(policy *kuadrantv1.AuthPolic
 			}
 		}
 
-		parsed, err := kuadrantpolicymachinery.ParseTopologyPath(effectivePolicy.Path)
+		parsed, err := kuadrantpolicymachinery.ParseTopologyPath(effectivePolicy.Path) // NOTE: This could be costly need to look into it
 		if err != nil {
 			if errors.As(err, &kuadrantpolicymachinery.ErrInvalidPath{}) {
 				logger.V(1).Info("skipping effectivePolicy for invalid path", "path", effectivePolicy.Path)
@@ -222,6 +222,9 @@ func (r *AuthPolicyStatusUpdater) enforcedCondition(policy *kuadrantv1.AuthPolic
 			}
 			continue
 		}
+
+		// PERF: is it worth doing the cheep checks first?
+		// Could these pasre checks be done in a stich, It cant change from one to the next. <-- this I think is wrong the parsed is a struct with many types. There can be some thing that we do here.
 
 		// Check for deletion timestamps
 		if parsed.GatewayClass.GetDeletionTimestamp() != nil || parsed.Gateway.GetDeletionTimestamp() != nil {
@@ -245,13 +248,13 @@ func (r *AuthPolicyStatusUpdater) enforcedCondition(policy *kuadrantv1.AuthPolic
 			continue
 		}
 
-		effectivePolicyRules := effectivePolicy.Spec.Rules()
+		effectivePolicyRules := effectivePolicy.Spec.Rules() // NOTE: memory allocation. Could do a different method of access with out doing the memory copy
 		if len(effectivePolicyRules) > 0 {
 			for _, policyRuleKey := range policyRuleKeys {
 				if effectivePolicyRule, ok := effectivePolicyRules[policyRuleKey]; !ok || (ok && effectivePolicyRule.GetSource() != policy.GetLocator()) { // policy rule has been overridden by another policy
 					if ok {
 						// Rule exists in effective policy but from a different source (rule-level override)
-						overridingPolicies[policyRuleKey] = append(overridingPolicies[policyRuleKey], effectivePolicyRule.GetSource())
+						overridingPolicies[policyRuleKey] = append(overridingPolicies[policyRuleKey], effectivePolicyRule.GetSource()) // HACK: there is double access done on the GetSource(). Could this be better?
 					} else {
 						// Rule doesn't exist at all (atomic override) - the policies that contributed
 						// to the effective policy are the ones that overrode this policy
@@ -291,8 +294,8 @@ func (r *AuthPolicyStatusUpdater) enforcedCondition(policy *kuadrantv1.AuthPolic
 	var componentsToSync []string
 
 	// check the status of Authorino
-	authorino := GetAuthorinoFromTopology(topology)
-	if authorino == nil {
+	authorino := GetAuthorinoFromTopology(topology) // NOTE: Almost sure this could be pass it.
+	if authorino == nil {                           // NOTE: If authorino is pass in this should be possible to do outside loop.
 		return kuadrant.EnforcedCondition(policy, kuadrant.NewErrSystemResource("authornio"), false)
 	}
 	if !meta.IsStatusConditionTrue(lo.Map(authorino.Status.Conditions, authorinoOperatorConditionToProperConditionFunc), string(authorinooperatorv1beta1.ConditionReady)) {
@@ -300,7 +303,8 @@ func (r *AuthPolicyStatusUpdater) enforcedCondition(policy *kuadrantv1.AuthPolic
 	}
 
 	// check status of the authconfigs for HTTP routes
-	isAuthConfigReady := authConfigReadyStatusFunc(state)
+	// NOTE: It is looking like the authConfigReadystatusFunc call can be made outside the loop
+	isAuthConfigReady := authConfigReadyStatusFunc(state) // WARNING: This could be really bad. need to dive into the function
 	for pathID, httpRouteRule := range affectedHTTPRouteRules {
 		authConfigName := AuthConfigNameForPath(pathID)
 		authConfig, found := lo.Find(topology.Objects().Children(httpRouteRule), func(authConfig machinery.Object) bool {
@@ -325,16 +329,16 @@ func (r *AuthPolicyStatusUpdater) enforcedCondition(policy *kuadrantv1.AuthPolic
 	// check the status of the gateways' configuration resources
 	for _, g := range affectedGateways {
 		controllerName := g.gatewayClass.Spec.ControllerName
-		switch defaultGatewayControllerName(controllerName) {
+		switch defaultGatewayControllerName(controllerName) { // NOTE: There might be issue with tryng to load the stuff before hand.
 		case defaultIstioGatewayControllerName:
 			// EnvoyFilter
-			istioAuthClustersModifiedGateways, _ := state.Load(StateIstioAuthClustersModified)
+			istioAuthClustersModifiedGateways, _ := state.Load(StateIstioAuthClustersModified) // NOTE: I think this can be loaded before loop starts
 			componentsToSync = append(componentsToSync, gatewayComponentsToSync(g.gateway, kuadrantistio.EnvoyFilterGroupKind, istioAuthClustersModifiedGateways, topology, func(_ machinery.Object) bool {
 				// return meta.IsStatusConditionTrue(lo.Map(obj.(*controller.RuntimeObject).Object.(*istioclientgonetworkingv1alpha3.EnvoyFilter).Status.Conditions, kuadrantistio.ConditionToProperConditionFunc), "Ready")
 				return true // Istio won't ever populate the status stanza of EnvoyFilter resources, so we cannot expect to find a given a condition there
 			})...)
 			// WasmPlugin
-			istioExtensionsModifiedGateways, _ := state.Load(StateIstioExtensionsModified)
+			istioExtensionsModifiedGateways, _ := state.Load(StateIstioExtensionsModified) // NOTE: I think this can be loaded before loop starts
 			componentsToSync = append(componentsToSync, gatewayComponentsToSync(g.gateway, kuadrantistio.WasmPluginGroupKind, istioExtensionsModifiedGateways, topology, func(_ machinery.Object) bool {
 				// return meta.IsStatusConditionTrue(lo.Map(obj.(*controller.RuntimeObject).Object.(*istioclientgoextensionv1alpha1.WasmPlugin).Status.Conditions, kuadrantistio.ConditionToProperConditionFunc), "Ready")
 				return true // Istio won't ever populate the status stanza of WasmPlugin resources, so we cannot expect to find a given a condition there
@@ -342,12 +346,12 @@ func (r *AuthPolicyStatusUpdater) enforcedCondition(policy *kuadrantv1.AuthPolic
 		case defaultEnvoyGatewayGatewayControllerName:
 			gatewayAncestor := gatewayapiv1.ParentReference{Name: gatewayapiv1.ObjectName(g.gateway.GetName()), Namespace: ptr.To(gatewayapiv1.Namespace(g.gateway.GetNamespace()))}
 			// EnvoyPatchPolicy
-			envoyGatewayAuthClustersModifiedGateways, _ := state.Load(StateEnvoyGatewayAuthClustersModified)
+			envoyGatewayAuthClustersModifiedGateways, _ := state.Load(StateEnvoyGatewayAuthClustersModified) // NOTE: I think this can be loaded before loop starts
 			componentsToSync = append(componentsToSync, gatewayComponentsToSync(g.gateway, kuadrantenvoygateway.EnvoyPatchPolicyGroupKind, envoyGatewayAuthClustersModifiedGateways, topology, func(obj machinery.Object) bool {
 				return meta.IsStatusConditionTrue(kuadrantgatewayapi.PolicyStatusConditionsFromAncestor(obj.(*controller.RuntimeObject).Object.(*envoygatewayv1alpha1.EnvoyPatchPolicy).Status, controllerName, gatewayAncestor, gatewayapiv1.Namespace(obj.GetNamespace())), string(envoygatewayv1alpha1.PolicyConditionProgrammed))
 			})...)
 			// EnvoyExtensionPolicy
-			envoyGatewayExtensionsModifiedGateways, _ := state.Load(StateEnvoyGatewayExtensionsModified)
+			envoyGatewayExtensionsModifiedGateways, _ := state.Load(StateEnvoyGatewayExtensionsModified) // NOTE: I think this can be loaded before loop starts
 			componentsToSync = append(componentsToSync, gatewayComponentsToSync(g.gateway, kuadrantenvoygateway.EnvoyExtensionPolicyGroupKind, envoyGatewayExtensionsModifiedGateways, topology, func(obj machinery.Object) bool {
 				return meta.IsStatusConditionTrue(kuadrantgatewayapi.PolicyStatusConditionsFromAncestor(obj.(*controller.RuntimeObject).Object.(*envoygatewayv1alpha1.EnvoyExtensionPolicy).Status, controllerName, gatewayAncestor, gatewayapiv1.Namespace(obj.GetNamespace())), string(gatewayapiv1alpha2.PolicyConditionAccepted))
 			})...)
@@ -356,7 +360,7 @@ func (r *AuthPolicyStatusUpdater) enforcedCondition(policy *kuadrantv1.AuthPolic
 		}
 	}
 
-	if len(celValidationErrors) > 0 {
+	if len(celValidationErrors) > 0 { // NOTE: Would it make more sense to do this earlier in the stack?
 		return kuadrant.EnforcedCondition(policy, kuadrant.NewErrCelValidation(celValidationErrors), false)
 	}
 
@@ -386,7 +390,7 @@ func authorinoConditionToProperConditionFunc(cond authorinov1beta3.AuthConfigSta
 }
 
 func authConfigReadyStatusFunc(state *sync.Map) func(authConfig *authorinov1beta3.AuthConfig) bool {
-	modifiedAuthConfigs, modified := state.Load(StateModifiedAuthConfigs)
+	modifiedAuthConfigs, modified := state.Load(StateModifiedAuthConfigs) // NOTE: This possible can be pass in from outside the loop
 	if !modified {
 		return authConfigReadyStatus
 	}
