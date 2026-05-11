@@ -833,7 +833,16 @@ func (b *BootOptionsBuilder) finalStepsWorkflow() *controller.Workflow {
 	return workflow
 }
 
-func GetKuadrantFromTopology(topology *machinery.Topology) *kuadrantv1beta1.Kuadrant {
+const StateKuadrant = "kuadrant"
+
+func GetKuadrantFromTopology(topology *machinery.Topology, state *sync.Map) *kuadrantv1beta1.Kuadrant {
+	if state != nil {
+		a, ok := state.Load(StateKuadrant)
+		if ok {
+			kuadrant, _ := a.(*kuadrantv1beta1.Kuadrant)
+			return kuadrant
+		}
+	}
 	kuadrants := lo.FilterMap(topology.Objects().Roots(), func(root machinery.Object, _ int) (controller.Object, bool) {
 		o, isSortable := root.(controller.Object)
 		return o, isSortable && root.GroupVersionKind().GroupKind() == kuadrantv1beta1.KuadrantGroupKind && o.GetDeletionTimestamp() == nil
@@ -843,6 +852,9 @@ func GetKuadrantFromTopology(topology *machinery.Topology) *kuadrantv1beta1.Kuad
 	}
 	sort.Sort(controller.ObjectsByCreationTimestamp(kuadrants))
 	kuadrant, _ := kuadrants[0].(*kuadrantv1beta1.Kuadrant)
+	if state != nil {
+		state.Store(StateKuadrant, kuadrant)
+	}
 	return kuadrant
 }
 

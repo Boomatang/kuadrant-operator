@@ -136,8 +136,10 @@ func benchmarkSnapshotAllPolicies(b *testing.B, snapshotPath string) {
 		b.Fatalf("Failed to load snapshot: %v", err)
 	}
 
+	state := &sync.Map{}
+
 	// Find a Kuadrant instance
-	kuadrant := GetKuadrantFromTopology(topology)
+	kuadrant := GetKuadrantFromTopology(topology, state)
 	if kuadrant == nil {
 		b.Skip("No Kuadrant instance found in topology")
 		return
@@ -147,7 +149,6 @@ func benchmarkSnapshotAllPolicies(b *testing.B, snapshotPath string) {
 	effectivePolicies := CalculateEffectiveAuthPolicies(context.TODO(), topology, kuadrant, &sync.Map{})
 
 	// Create state
-	state := &sync.Map{}
 	state.Store(StateEffectiveAuthPolicies, effectivePolicies)
 	state.Store(StateAuthPolicyValid, map[string]error{})
 
@@ -250,7 +251,8 @@ func benchmarkSnapshotSinglePolicy(b *testing.B, snapshotPath string) {
 		b.Fatalf("Failed to load snapshot: %v", err)
 	}
 
-	kuadrant := GetKuadrantFromTopology(topology)
+	state := &sync.Map{}
+	kuadrant := GetKuadrantFromTopology(topology, state)
 	if kuadrant == nil {
 		b.Skip("No Kuadrant instance found in topology")
 		return
@@ -258,7 +260,6 @@ func benchmarkSnapshotSinglePolicy(b *testing.B, snapshotPath string) {
 
 	effectivePolicies := CalculateEffectiveAuthPolicies(context.TODO(), topology, kuadrant, &sync.Map{})
 
-	state := &sync.Map{}
 	state.Store(StateEffectiveAuthPolicies, effectivePolicies)
 	state.Store(StateAuthPolicyValid, map[string]error{})
 

@@ -155,8 +155,8 @@ func (r *AuthPolicyStatusUpdater) UpdateStatus(ctx context.Context, _ []controll
 }
 
 func (r *AuthPolicyStatusUpdater) enforcedCondition(policy *kuadrantv1.AuthPolicy, topology *machinery.Topology, state *sync.Map, logger logr.Logger) *metav1.Condition {
-	kObj := GetKuadrantFromTopology(topology) // NOTE: This could be pass in as a nil pointer
-	if kObj == nil {                          // NOTE: Why do this check at all. If we pass in the kObj we can check before had and short this check.
+	kObj := GetKuadrantFromTopology(topology, state) // NOTE: This could be pass in as a nil pointer
+	if kObj == nil {                                 // NOTE: Why do this check at all. If we pass in the kObj we can check before had and short this check.
 		return kuadrant.EnforcedCondition(policy, kuadrant.NewErrSystemResource("kuadrant"), false)
 	}
 	policyKind := kuadrantv1.AuthPolicyGroupKind.Kind
@@ -294,8 +294,8 @@ func (r *AuthPolicyStatusUpdater) enforcedCondition(policy *kuadrantv1.AuthPolic
 	var componentsToSync []string
 
 	// check the status of Authorino
-	authorino := GetAuthorinoFromTopology(topology) // NOTE: Almost sure this could be pass it.
-	if authorino == nil {                           // NOTE: If authorino is pass in this should be possible to do outside loop.
+	authorino := GetAuthorinoFromTopology(topology, state) // NOTE: Almost sure this could be pass it.
+	if authorino == nil {                                  // NOTE: If authorino is pass in this should be possible to do outside loop.
 		return kuadrant.EnforcedCondition(policy, kuadrant.NewErrSystemResource("authornio"), false)
 	}
 	if !meta.IsStatusConditionTrue(lo.Map(authorino.Status.Conditions, authorinoOperatorConditionToProperConditionFunc), string(authorinooperatorv1beta1.ConditionReady)) {

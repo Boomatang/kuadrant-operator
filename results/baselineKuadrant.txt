@@ -1,0 +1,10 @@
+goos: linux
+goarch: amd64
+pkg: github.com/kuadrant/kuadrant-operator/internal/controller
+cpu: AMD Ryzen 7 PRO 7840HS w/ Radeon 780M Graphics 
+BenchmarkGetKuadrantFromTopology_RealCluster/10_authpolicies-16         	    4008	    296738 ns/op	  214890 B/op	    4540 allocs/op
+BenchmarkGetKuadrantFromTopology_RealCluster/150_authpolicies-16        	      26	  43199021 ns/op	35101824 B/op	  696736 allocs/op
+BenchmarkGetKuadrantFromTopology_RealCluster/300_authpolicies-16        	       6	 169952245 ns/op	138613365 B/op	 2743419 allocs/op
+BenchmarkGetKuadrantFromTopology_RealCluster/600_authpolicies-16        	       2	 656235493 ns/op	550852260 B/op	10886828 allocs/op
+PASS
+ok  	github.com/kuadrant/kuadrant-operator/internal/controller	12.689s

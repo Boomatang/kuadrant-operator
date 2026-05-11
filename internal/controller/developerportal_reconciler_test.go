@@ -4,6 +4,7 @@ package controllers
 
 import (
 	"context"
+	"sync"
 	"testing"
 
 	"github.com/kuadrant/policy-machinery/controller"
@@ -86,7 +87,8 @@ func TestDeveloperPortalReconciler(t *testing.T) {
 
 	t.Run("Topology with Kuadrant CR", func(subT *testing.T) {
 		topology := buildTopologyWithKuadrant(subT, true)
-		kuadrantCR := GetKuadrantFromTopology(topology)
+		var state *sync.Map
+		kuadrantCR := GetKuadrantFromTopology(topology, state)
 		assert.Assert(subT, kuadrantCR != nil, "GetKuadrantFromTopology should return Kuadrant CR")
 		assert.Equal(subT, kuadrantCR.Name, "kuadrant")
 		assert.Equal(subT, kuadrantCR.IsDeveloperPortalEnabled(), true)
