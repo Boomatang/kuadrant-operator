@@ -861,6 +861,7 @@ func initWorkflow(client *dynamic.DynamicClient) *controller.Workflow {
 		Precondition: traceReconcileFunc("init.event_logger", NewEventLogger().Log),
 		Tasks: []controller.ReconcileFunc{
 			traceReconcileFunc("init.topology_reconciler", NewTopologyReconciler(client, operatorNamespace).Reconcile),
+			traceReconcileFunc("finalize.deletion", NewFinalizerMaintianerReconciler(client).Subscription().Reconcile),
 		},
 	}
 }
